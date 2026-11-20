@@ -1,0 +1,14 @@
+*.mdf
+*.ldf
+*.bak
+*.csv
+.vs/
+*/bin/
+*/obj/
+*.user
+*.suo
+*.dtproj.user
+*.smproj.user
+*.database
+Thumbs.db
+.DS_Store
