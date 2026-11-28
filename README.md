@@ -96,3 +96,39 @@ This project adheres to software engineering best practices using feature-branch
 
 \* \*\*Simulated Data Anomalies:\*\* 2% of customer names contain leading/trailing spaces, and 0.5% (\~10,000 rows) of `SalesOrderDetails` contain negative quantities (`-1`) to validate automated ETL error interception in Module 3.
 
+
+---
+
+## 🏗️ Module 2: Enterprise Data Warehouse (`MegaCorp_DWH`) — Completed ✅
+
+In this phase, transactional data from `MegaCorp_ERP_OLTP` was transformed and loaded into an analytical **Galaxy Schema (Fact Constellation)** optimized for high-speed BI querying and historical accuracy.
+
+### 🔑 Key Architectural Decisions
+* **Galaxy Schema (Fact Constellation):** Chosen over a single Star Schema to model 4 distinct business processes (`Sales`, `Returns`, `Inventory`, `Finance`) at their exact grain without generating sparse `NULL` rows, while sharing **8 Conformed Dimensions**.
+* **Clustered Columnstore Indexes (CCI):** Applied across all 4 fact tables to achieve up to 10x data compression and enable Batch Mode execution for multi-million-row aggregations.
+* **Slowly Changing Dimensions (SCD Type 2):** Implemented (`StartDate`, `EndDate`, `IsCurrent`) on `DimProduct`, `DimCustomer`, and `DimEmployee` to preserve historical pricing, customer segments, and organizational changes.
+* **Error Quarantine Pattern:** Isolated `10,000` invalid sales records (`OrderQty <= 0`) into `err.Rejected_Sales_Records` with rejection reasons and timestamps, preventing pipeline failures while maintaining 100% financial auditability.
+* **Smart Surrogate Keys & Denormalization:** Built a dedicated `DimDate` table (`2020–2030`, `YYYYMMDD` integer keys) and flattened multi-table hierarchies (e.g., 5 product tables merged into `DimProduct`) to eliminate expensive runtime joins.
+
+### 📊 DWH Schema & Loaded Row Counts
+| Schema | Table Name | Role / Type | Loaded Rows | Notes |
+| :--- | :--- | :--- | :---: | :--- |
+| `dim` | `DimDate` | Conformed Dimension | 4,018 | Smart Key (`YYYYMMDD`), Weekend flags |
+| `dim` | `DimProduct` | SCD Type 2 Dimension | 2,000 | Merged Categories, SubCategories, Brands & Suppliers |
+| `dim` | `DimCustomer` | SCD Type 2 Dimension | 50,000 | Standardized (`TRIM`/`UPPER`), merged Regions & Segments |
+| `dim` | `DimBranch` | Conformed Dimension | 30 | Merged Branches & Geographic Regions |
+| `dim` | `DimChannel` | Conformed Dimension | 4 | Sales Channels |
+| `dim` | `DimEmployee` | SCD Type 2 Dimension | 2,500 | Merged Departments, Cost Centers & Job Titles |
+| `dim` | `DimWarehouse` | Conformed Dimension | — | Warehouses & storage capacity |
+| `dim` | `DimGLAccount` | Conformed Dimension | — | General Ledger Chart of Accounts |
+| `fact` | `FactSales` | Fact Table (CCI) | 1,990,000 | Clean sales transactions with pre-calculated profit |
+| `fact` | `FactReturns` | Fact Table (CCI) | 150,000 | Customer returns & refund amounts |
+| `fact` | `FactInventory` | Fact Table (CCI) | 1,000,000 | Warehouse stock movements (`IN`/`OUT`/`ADJUSTMENT`) |
+| `fact` | `FactFinance` | Fact Table (CCI) | 500,000 | Actual vs. Budget financial postings |
+| `err` | `Rejected_Sales_Records` | Error Quarantine | 10,000 | Isolated negative/zero quantity anomalies |
+| `etl` | `Watermark` | Control Table | 4 | Tracks `LastLoadedID` for incremental SSIS loads |
+
+### 📂 Scripts Added in Module 2
+* `01_Database_Scripts/03_Create_DWH_Galaxy_Schema.sql`
+* `01_Database_Scripts/04_Populate_DWH_Dimensions.sql`
+* `01_Database_Scripts/05_Populate_DWH_Facts.sql`
